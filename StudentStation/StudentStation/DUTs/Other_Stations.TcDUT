@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <DUT Name="Other_Stations" Id="{0d58b0c6-8351-4767-a132-d08f4eb08be0}">
+    <Declaration><![CDATA[TYPE Other_Stations :
+STRUCT
+	Scanner: Storage;
+	AGV: Storage;
+	Table: Storage;
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

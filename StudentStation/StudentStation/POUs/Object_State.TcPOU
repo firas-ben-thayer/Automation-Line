@@ -1,0 +1,68 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <POU Name="Object_State" Id="{661ec6a6-29b9-473c-a397-9de14c58322d}" SpecialFunc="None">
+    <Declaration><![CDATA[PROGRAM Object_State
+VAR
+	Delay_1,Delay_2 : TON;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[IF Automatic_Mode.Auto_Lamp THEN
+	IF Automatic_Mode_Control_Panel.Robot_At_AGV THEN
+		CommData.mxRequestAGV := TRUE;
+		gvl.qxPalletPlacedinAGV:=FALSE;
+		IF GVL.ixAGVatStation THEN
+			Delay_1(IN:=TRUE, PT:=T#3S);
+			IF Delay_1.Q THEN
+				gvl.qxPalletPlacedinAGV:=TRUE;
+				CommData.mxRequestAGV := FALSE;
+			END_IF
+		END_IF
+		
+	ELSIF Automatic_Mode_Control_Panel.Object_Placed_In_AGV OR Automatic_Mode_Control_Panel.Parts_Dropped THEN
+		CommData.mxRequestAGV := TRUE;
+		gvl.qxPickedfromAGV:=FALSE;
+		IF GVL.ixAGVatStation THEN
+			Delay_2(IN:=TRUE, PT:=T#3S);
+			IF Delay_2.Q THEN
+				gvl.qxPickedfromAGV:=TRUE;
+				CommData.mxRequestAGV := FALSE;
+			END_IF
+		END_IF
+	ELSE
+		Delay_1(IN:=FALSE);
+		Delay_2(IN:=FALSE);
+		CommData.mxRequestAGV := FALSE;
+		gvl.qxPickedfromAGV:=FALSE;
+		gvl.qxPickedfromAGV:=FALSE;
+	END_IF
+END_IF
+IF Manual_Mode.Manual_Lamp AND (GVL.qxPalletPlacedinAGV OR GVL.qxPickedfromAGV) THEN
+	CommData.mxRequestAGV := FALSE;
+END_IF]]></ST>
+    </Implementation>
+    <LineIds Name="Object_State">
+      <LineId Id="320" Count="0" />
+      <LineId Id="337" Count="1" />
+      <LineId Id="144" Count="0" />
+      <LineId Id="194" Count="1" />
+      <LineId Id="333" Count="1" />
+      <LineId Id="198" Count="1" />
+      <LineId Id="314" Count="0" />
+      <LineId Id="341" Count="0" />
+      <LineId Id="339" Count="1" />
+      <LineId Id="285" Count="2" />
+      <LineId Id="335" Count="1" />
+      <LineId Id="290" Count="3" />
+      <LineId Id="315" Count="0" />
+      <LineId Id="294" Count="0" />
+      <LineId Id="308" Count="0" />
+      <LineId Id="312" Count="0" />
+      <LineId Id="305" Count="0" />
+      <LineId Id="282" Count="0" />
+      <LineId Id="323" Count="1" />
+      <LineId Id="328" Count="0" />
+      <LineId Id="326" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

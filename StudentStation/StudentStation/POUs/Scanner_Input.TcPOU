@@ -1,0 +1,65 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <POU Name="Scanner_Input" Id="{c259118b-d9a6-4113-80b5-1742e31b863b}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK Scanner_Input
+VAR_INPUT
+	Object_Arrived:BOOL;
+END_VAR
+VAR_OUTPUT
+	Enable:BOOL;
+	Code: INT;
+END_VAR
+VAR
+	sensor1: INT;
+	sensor2: INT;
+	sensor3: INT;
+	sensor4: INT;
+	Sum: INT;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[IF Object_Arrived OR CommData.mxScannernoobject THEN
+	IF gvl.ixInductiveSensor1 THEN
+	sensor1:=1;
+	ELSE
+		sensor1:=0;
+	END_IF
+	IF gvl.ixInductiveSensor2 THEN
+		sensor2:=1;
+	ELSE
+		sensor2:=0;
+	END_IF
+	IF gvl.ixInductiveSensor3 THEN
+		sensor3:=1;
+	ELSE
+		sensor3:=0;
+	END_IF
+	IF gvl.ixInductiveSensor4 THEN
+		sensor4:=1;
+	ELSE
+		sensor4:=0;
+	END_IF
+	Sum:= sensor1 + 2*sensor2 + 4*sensor3 + 8*sensor4;
+	Enable:=TRUE;
+		IF Sum>0 THEN
+			Code:= sum;
+		END_IF
+ELSE
+	Enable:=FALSE;
+END_IF
+]]></ST>
+    </Implementation>
+    <LineIds Name="Scanner_Input">
+      <LineId Id="137" Count="0" />
+      <LineId Id="140" Count="19" />
+      <LineId Id="193" Count="0" />
+      <LineId Id="197" Count="0" />
+      <LineId Id="191" Count="0" />
+      <LineId Id="196" Count="0" />
+      <LineId Id="195" Count="0" />
+      <LineId Id="168" Count="1" />
+      <LineId Id="139" Count="0" />
+      <LineId Id="118" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

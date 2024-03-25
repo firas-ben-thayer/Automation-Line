@@ -1,0 +1,21 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <POU Name="Buffer_Number" Id="{01ba2a52-5081-4be0-ba17-e814631d90c3}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK Buffer_Number
+VAR_OUTPUT
+	Buffer_Number:INT;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[IF Manual_Mode.Scan_Buffer_1_Button THEN
+	Buffer_Number:= 1;
+ELSIF Manual_Mode.Scan_Buffer_2_Button THEN
+	Buffer_Number:= 2;
+ELSIF Manual_Mode.Scan_Buffer_3_Button THEN
+	Buffer_Number:= 3;
+END_IF]]></ST>
+    </Implementation>
+    <LineIds Name="Buffer_Number">
+      <LineId Id="59" Count="6" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

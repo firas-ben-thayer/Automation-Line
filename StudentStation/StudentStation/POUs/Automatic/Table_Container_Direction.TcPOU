@@ -1,0 +1,36 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <POU Name="Table_Container_Direction" Id="{219819a7-d41f-4b67-8521-1ea334d321c2}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK Table_Container_Direction
+VAR_INPUT
+	Code:BOOL;
+END_VAR
+VAR_OUTPUT
+	Enable:BOOL;
+END_VAR
+VAR
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[IF Code =TRUE THEN
+	Enable:= TRUE;
+	IF NOT CommData.mxScannernoobject THEN
+		gvl.ixInductiveSensor1:=FALSE;
+		gvl.ixInductiveSensor2:=FALSE;
+		gvl.ixInductiveSensor3:=FALSE;
+		gvl.ixInductiveSensor4:=FALSE;
+	END_IF
+ELSE
+	Enable:= FALSE;
+END_IF
+]]></ST>
+    </Implementation>
+    <LineIds Name="Table_Container_Direction">
+      <LineId Id="50" Count="0" />
+      <LineId Id="53" Count="5" />
+      <LineId Id="51" Count="0" />
+      <LineId Id="62" Count="1" />
+      <LineId Id="59" Count="0" />
+      <LineId Id="36" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

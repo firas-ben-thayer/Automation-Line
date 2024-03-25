@@ -1,0 +1,33 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <POU Name="Deactivate" Id="{e5b7c34c-ca42-434f-a839-64a12e943f87}" SpecialFunc="None">
+    <Declaration><![CDATA[PROGRAM Deactivate
+VAR
+	Pick_Leave_Appearance: BOOL;
+	Buffer_Appearance: BOOL;
+	Scan_Appearance: BOOL;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[IF Manual_Mode_Control_Panel.Input_Number_Manual_Menu = 3 OR Manual_Mode_Control_Panel.Input_Number_Manual_Menu = 7 OR Manual_Mode_Control_Panel.Input_Number_Manual_Menu = 8 OR Manual_Mode_Control_Panel.Input_Number_Manual_Menu = 9 THEN
+	Pick_Leave_Appearance := TRUE;
+ELSE
+	Pick_Leave_Appearance := FALSE;
+END_IF
+IF Manual_Mode_Control_Panel.Input_Number_Manual_Menu = 1 OR Manual_Mode_Control_Panel.Input_Number_Manual_Menu = 3 THEN
+	Buffer_Appearance := TRUE;
+ELSE
+	Buffer_Appearance := FALSE;
+END_IF
+IF Manual_Mode_Control_Panel.Input_Number_Manual_Menu = 10 THEN
+	Scan_Appearance := TRUE;
+ELSE
+	Scan_Appearance := FALSE;
+END_IF]]></ST>
+    </Implementation>
+    <LineIds Name="Deactivate">
+      <LineId Id="9" Count="13" />
+      <LineId Id="5" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

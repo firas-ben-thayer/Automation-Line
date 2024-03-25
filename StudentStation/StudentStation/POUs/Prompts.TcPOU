@@ -1,0 +1,483 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <POU Name="Prompts" Id="{580d5e81-1ef4-4a81-81fc-4cd76defab2c}" SpecialFunc="None">
+    <Declaration><![CDATA[PROGRAM Prompts
+VAR
+	Table : BOOL;
+	Buffer_1: BOOL;
+	Buffer_2: BOOL;
+	Buffer_3: BOOL;
+	Scanner: BOOL;
+	Home: BOOL;
+	AGV: BOOL;
+	Quantity: INT;
+	Delay_1, Delay_2:TON;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[// Dropping Object in AGV from operator
+IF gvl.qxPalletPlacedinAGV OR (Automatic_Mode.Auto_Lamp AND GVL.ixAGVatStation AND gvl.Sensors.AGV.Quatity = 0 AND gvl.qsObjectInGripper = '0') THEN
+	gvl.Sensors.AGV.Quatity:= 1;
+	gvl.Sensors.AGV.Component:= 'UNKNOWN';
+ELSIF gvl.qxPickedfromAGV THEN
+	gvl.Sensors.AGV.Quatity:= 0;
+	gvl.Sensors.AGV.Component:= '0';
+END_IF
+
+// Connection between Table And color
+IF gvl.Container_Color <> '0' AND gvl.Sensors.Table.Component='0' THEN
+	gvl.Sensors.Table.Component:= CONCAT(gvl.Container_Color, ' CONTAINER');
+	gvl.Sensors.Table.Quatity:= 1;
+END_IF
+IF gvl.Container_Color = '0' THEN
+	IF LEFT(gvl.Sensors.Table.Component,4) = 'BLUE' THEN
+		gvl.Container_Color:= 'BLUE';
+	ELSIF LEFT(gvl.Sensors.Table.Component,6) = 'YELLOW' THEN
+		gvl.Container_Color:= 'YELLOW';
+	ELSIF LEFT(gvl.Sensors.Table.Component,3) = 'RED' THEN
+		gvl.Container_Color:= 'RED';
+	END_IF
+END_IF
+
+// Auto Mode
+
+// Coming to grab something
+IF Automatic_Mode.Auto_Lamp THEN
+	IF gvl.Sensors.Table.Quatity>0 AND gvl.Sensors.Table.Component <> CONCAT(gvl.Container_Color, ' CONTAINER') AND (Automatic_Mode_Control_Panel.Place_Assembled_Parts_In_AGV.ABBPickLeaveContaineronTable.mxDone) THEN
+		gvl.qsObjectInGripper:= gvl.Sensors.Table.Component;
+		Quantity:= 1;
+		gvl.Sensors.Table.Component := '0';
+		gvl.Sensors.Table.Quatity := 0;
+	ELSIF (gvl.qsObjectInGripper = '0' AND gvl.Sensors.Scanner.Component<>'UNKNOWN' AND CommData.mxScannernoobject) OR (gvl.qsObjectInGripper = '0' AND Automatic_Mode_Control_Panel.UNKNOWN_Picked AND (gvl.Sensors.Scanner.Component='INVALID PRODUCT' OR gvl.Sensors.Scanner.Component='UNKNOWN')) THEN
+		gvl.qsObjectInGripper:= gvl.Sensors.Scanner.Component;
+		Quantity:= gvl.Sensors.Scanner.Quatity;
+		gvl.Sensors.Scanner.Component := '0';
+		gvl.Sensors.Scanner.Quatity := 0;
+	ELSIF gvl.Sensors.AGV.Quatity>0 AND (Automatic_Mode_Control_Panel.Move_From_AGV_To_Scanner.ABBPickLeaveContainerAGV.mxDone)  THEN
+		gvl.qsObjectInGripper:= gvl.Sensors.AGV.Component;
+		Quantity:= 1;
+		gvl.Sensors.AGV.Component := '0';
+		gvl.Sensors.AGV.Quatity := 0;
+	END_IF
+END_IF
+
+// Coming to grab something from buffers
+IF gvl.qsObjectInGripper = '0' AND Automatic_Mode.Auto_Lamp THEN
+	IF Buffer_1 AND GVL.BufferProducts.Storage1.Quatity>0 AND Automatic_Mode_Control_Panel.ABBAssemble.mwBufferID = 1 THEN // >0 means making sure it's not empty
+		gvl.qsObjectInGripper:= GVL.BufferProducts.Storage1.Component;
+		Quantity:= 1;
+	ELSIF Buffer_2 AND GVL.BufferProducts.Storage2.Quatity>0 AND Automatic_Mode_Control_Panel.ABBAssemble.mwBufferID = 2 THEN
+		gvl.qsObjectInGripper:= GVL.BufferProducts.Storage2.Component;
+		Quantity:= 1;
+	ELSIF Buffer_3 AND GVL.BufferProducts.Storage3.Quatity>0 AND Automatic_Mode_Control_Panel.ABBAssemble.mwBufferID = 3 THEN
+		gvl.qsObjectInGripper:= GVL.BufferProducts.Storage3.Component;
+		Quantity:= 1;
+	END_IF
+END_IF
+
+// Coming to drop something
+IF Automatic_Mode.Auto_Lamp THEN
+	IF (Table AND gvl.qsObjectInGripper <> '0' AND (gvl.qsObjectInGripper <> gvl.Sensors.Table.Component) AND (Automatic_Mode_Control_Panel.Go_To_Container_Table.ABBPickLeaveContaineronTable.mxDone OR Automatic_Mode_Control_Panel.Object_Assembled OR Automatic_Mode_Control_Panel.Robot_In_Assembly)) OR (Table AND GVL.ixInductiveSensorinTool) THEN
+		IF gvl.Sensors.Table.Component='0' THEN
+			gvl.Sensors.Table.Component:= gvl.qsObjectInGripper;
+		ELSE
+			gvl.Sensors.Table.Component:= 'ASSEMBLED PARTS';
+		END_IF
+		gvl.Sensors.Table.Quatity := 1;
+		Quantity:= 0;
+		gvl.qsObjectInGripper:= '0';
+		
+	ELSIF Scanner AND gvl.qsObjectInGripper<> '0' AND GVL.Sensors.Scanner.Component='0' AND (Automatic_Mode_Control_Panel.Move_From_AGV_To_Scanner.ABBPickLeaveScanner.mxDone OR Automatic_Mode_Control_Panel.Parts_Dropped) THEN
+		gvl.Sensors.Scanner.Component:= gvl.qsObjectInGripper;
+		gvl.Sensors.Scanner.Quatity := gvl.Sensors.Scanner.Quatity + Quantity;
+		Quantity:= 0;
+		gvl.qsObjectInGripper:= '0';
+	
+	ELSIF AGV AND GVL.Sensors.AGV.Component='0' AND gvl.qsObjectInGripper<>'0' AND (Automatic_Mode_Control_Panel.Place_Assembled_Parts_In_AGV.ABBPickLeaveContainerAGV.mxDone OR Automatic_Mode_Control_Panel.Parts_Dropped) THEN
+		gvl.Sensors.AGV.Component:= gvl.qsObjectInGripper;
+		gvl.Sensors.AGV.Quatity := gvl.Sensors.AGV.Quatity + Quantity;
+		Quantity:= 0;
+		gvl.qsObjectInGripper:= '0';
+	END_IF
+END_IF
+
+// Coming to drop something in buffers
+IF gvl.qsObjectInGripper<> '0' AND Automatic_Mode.Auto_Lamp AND gvl.qsObjectInGripper<>'ASSEMBLED PARTS' AND gvl.qsObjectInGripper<>'INVALID PRODUCT' AND gvl.qsObjectInGripper<>'UNKNOWN' AND NOT CommData.mxGripper AND (Buffer_1 OR Buffer_2 OR Buffer_3) THEN
+	Quantity:= 0;
+	gvl.qsObjectInGripper:= '0';
+END_IF
+
+// Manual Mode
+// Coming to grab something
+IF Manual_Mode_Control_Panel.Input_Number_Pick_Leave_Menu = 1 AND Manual_Mode.Execute_Button AND gvl.qsObjectInGripper = '0' THEN
+	IF Table AND gvl.Sensors.Table.Component= 'ASSEMBLED PARTS' AND Manual_Mode_Control_Panel.Input_Number_Manual_Menu = 8 THEN
+		gvl.qsObjectInGripper:= gvl.Sensors.Table.Component;
+		Quantity:= 1;
+		gvl.Sensors.Table.Quatity := 0;
+		gvl.Sensors.Table.Component := '0';
+	END_IF
+	IF Scanner AND gvl.Sensors.Scanner.Quatity>0 AND Manual_Mode_Control_Panel.Input_Number_Manual_Menu = 9 THEN
+		gvl.qsObjectInGripper:= gvl.Sensors.Scanner.Component;
+		Quantity:= gvl.Sensors.Scanner.Quatity;
+		gvl.Sensors.Scanner.Quatity := 0;
+		gvl.Sensors.Scanner.Component := '0';
+	END_IF
+	IF AGV AND gvl.Sensors.AGV.Quatity>0 AND Manual_Mode_Control_Panel.Input_Number_Manual_Menu = 7 THEN
+		gvl.qsObjectInGripper:= gvl.Sensors.AGV.Component;
+		Quantity:= 1;
+		gvl.Sensors.AGV.Quatity := 0;
+		gvl.Sensors.AGV.Component := '0';
+	END_IF
+END_IF
+
+// Coming to grab something from buffers
+IF Manual_Mode_Control_Panel.Input_Number_Pick_Leave_Menu = 1 AND gvl.qsObjectInGripper = '0' AND Manual_Mode_Control_Panel.ABBPickLeaveBuffer.mxDone AND Manual_Mode_Control_Panel.Input_Number_Manual_Menu=3 THEN
+	IF Buffer_1 AND GVL.BufferProducts.Storage1.Quatity>0 THEN // >0 means making sure it's not empty
+		gvl.qsObjectInGripper:= GVL.BufferProducts.Storage1.Component;
+		Quantity:= 1;
+		GVL.BufferProducts.Storage1.Quatity := GVL.BufferProducts.Storage1.Quatity - 1;
+		IF GVL.BufferProducts.Storage1.Quatity = 0 THEN
+			GVL.BufferProducts.Storage1.Component:= '0';
+		END_IF
+	END_IF
+	IF Buffer_2 AND GVL.BufferProducts.Storage2.Quatity>0 THEN
+		gvl.qsObjectInGripper:= GVL.BufferProducts.Storage2.Component;
+		Quantity:= 1;
+		GVL.BufferProducts.Storage2.Quatity := GVL.BufferProducts.Storage2.Quatity - 1;
+		IF GVL.BufferProducts.Storage2.Quatity = 0 THEN
+			GVL.BufferProducts.Storage2.Component:= '0';
+		END_IF
+	END_IF
+	IF Buffer_3 AND GVL.BufferProducts.Storage3.Quatity>0 THEN
+		gvl.qsObjectInGripper:= GVL.BufferProducts.Storage3.Component;
+		Quantity:= 1;
+		GVL.BufferProducts.Storage3.Quatity := GVL.BufferProducts.Storage3.Quatity - 1;
+		IF GVL.BufferProducts.Storage3.Quatity = 0 THEN
+			GVL.BufferProducts.Storage3.Component:= '0';
+		END_IF
+	END_IF
+END_IF
+
+// Coming to drop something
+IF gvl.qsObjectInGripper<> '0' AND Manual_Mode_Control_Panel.Input_Number_Pick_Leave_Menu = 2 AND Manual_Mode.Execute_Button THEN
+	IF Table AND Manual_Mode_Control_Panel.Input_Number_Manual_Menu = 8 THEN
+		IF gvl.Sensors.Table.Component = '0' THEN
+			gvl.Sensors.Table.Component := gvl.qsObjectInGripper;
+		ELSE
+			gvl.Sensors.Table.Component:= 'ASSEMBLED PARTS';
+		END_IF
+		gvl.Sensors.Table.Quatity := gvl.Sensors.Table.Quatity + Quantity;
+		Quantity:= 0;
+		gvl.qsObjectInGripper:= '0';
+		
+	ELSIF Scanner AND GVL.Sensors.Scanner.Component='0' AND Manual_Mode_Control_Panel.Input_Number_Manual_Menu = 9 THEN
+		gvl.Sensors.Scanner.Component:= gvl.qsObjectInGripper;
+		gvl.Sensors.Scanner.Quatity := gvl.Sensors.Scanner.Quatity + Quantity;
+		Quantity:= 0;
+		gvl.qsObjectInGripper:= '0';
+	
+	ELSIF AGV AND GVL.Sensors.AGV.Component='0' AND Manual_Mode_Control_Panel.Input_Number_Manual_Menu = 7 THEN
+		gvl.Sensors.AGV.Component:= gvl.qsObjectInGripper;
+		gvl.Sensors.AGV.Quatity := gvl.Sensors.AGV.Quatity + Quantity;
+		Quantity:= 0;
+		gvl.qsObjectInGripper:= '0';
+	END_IF
+END_IF
+
+// Coming to drop something in buffers
+IF gvl.qsObjectInGripper<> '0' AND Manual_Mode_Control_Panel.Input_Number_Pick_Leave_Menu = 2 AND Manual_Mode_Control_Panel.ABBPickLeaveBuffer.mxDone AND Manual_Mode_Control_Panel.Input_Number_Manual_Menu=3 THEN
+	IF Buffer_1 AND GVL.BufferProducts.Storage1.Component='0' THEN
+		GVL.BufferProducts.Storage1.Component:= gvl.qsObjectInGripper;
+		GVL.BufferProducts.Storage1.Quatity := GVL.BufferProducts.Storage1.Quatity + Quantity;
+	
+	ELSIF Buffer_2 AND GVL.BufferProducts.Storage2.Component='0' THEN
+		GVL.BufferProducts.Storage2.Component:= gvl.qsObjectInGripper;
+		GVL.BufferProducts.Storage2.Quatity := GVL.BufferProducts.Storage2.Quatity + Quantity;
+	
+	ELSIF Buffer_3 AND GVL.BufferProducts.Storage3.Component='0' THEN
+		GVL.BufferProducts.Storage3.Component:= gvl.qsObjectInGripper;
+		GVL.BufferProducts.Storage3.Quatity := GVL.BufferProducts.Storage3.Quatity + Quantity;
+	END_IF		
+	Delay_1.IN:= FALSE;
+	Quantity:= 0;
+	gvl.qsObjectInGripper:= '0';
+END_IF
+
+// Spot where the robot is
+IF CommData.mwXaxis=CommData.ABBPostions.Storage1.X AND CommData.mwYaxis=CommData.ABBPostions.Storage1.Y THEN
+	GVL.Current_Task:='AT BUFFER 1';
+	GVL.ixExecuting:=FALSE;
+	Buffer_1:= TRUE;
+ELSIF CommData.mwXaxis=CommData.ABBPostions.Storage2.X AND CommData.mwYaxis=CommData.ABBPostions.Storage2.Y THEN
+	GVL.Current_Task:='AT BUFFER 2';
+	GVL.ixExecuting:=FALSE;
+	Buffer_2:= TRUE;
+ELSIF CommData.mwXaxis=CommData.ABBPostions.Storage3.X AND CommData.mwYaxis=CommData.ABBPostions.Storage3.Y THEN
+	GVL.Current_Task:='AT BUFFER 3';
+	GVL.ixExecuting:=FALSE;
+	Buffer_3:= TRUE;
+ELSIF CommData.mwXaxis=CommData.ABBPostions.Bufferhome.X AND CommData.mwYaxis=CommData.ABBPostions.Bufferhome.Y THEN
+	GVL.Current_Task:='AT BUFFER HOME';
+	GVL.ixExecuting:=FALSE;
+ELSIF CommData.mwXaxis=CommData.ABBPostions.AGVPOShome.X AND CommData.mwYaxis=CommData.ABBPostions.AGVPOShome.Y THEN
+	GVL.Current_Task:='AT AGV';
+	GVL.ixExecuting:=FALSE;
+	AGV:= TRUE;
+ELSIF CommData.mwXaxis=CommData.ABBPostions.Home.X AND CommData.mwYaxis=CommData.ABBPostions.Home.Y THEN
+	GVL.Current_Task:='AT HOME';
+	GVL.ixExecuting:=FALSE;
+	Home:= TRUE;
+ELSIF CommData.mwXaxis=CommData.ABBPostions.Scannerhome.X AND CommData.mwYaxis=CommData.ABBPostions.Scannerhome.Y THEN
+	GVL.Current_Task:='AT SCANNER';
+	GVL.ixExecuting:=FALSE;
+	Scanner:= TRUE;
+ELSIF CommData.mwXaxis=CommData.ABBPostions.Tablehome.X AND CommData.mwYaxis=CommData.ABBPostions.Tablehome.Y THEN
+	GVL.Current_Task:='AT TABLE';
+	GVL.ixExecuting:=FALSE;
+	Table:= TRUE;
+ELSE
+	GVL.Current_Task:='MOVING...';
+	GVL.ixExecuting:=TRUE;
+	Table:= FALSE;
+	Buffer_1:= FALSE;
+	Buffer_2:= FALSE;
+	Buffer_3:= FALSE;
+	Scanner:= FALSE;
+	Home:= FALSE;
+	AGV:= FALSE;
+END_IF
+
+// Scanner Values Automatic
+IF Automatic_Mode.Auto_Lamp AND Scanner AND CommData.mxScannernoobject AND gvl.qsObjectInGripper = '0' AND gvl.Sensors.Scanner.Component='UNKNOWN' THEN
+	CASE Automatic_Mode_Control_Panel.Scanner_Input.Code OF
+		0:
+			gvl.Sensors.Scanner.Component := 'INVALID PRODUCT';
+			gvl.Sensors.Scanner.Quatity := 1;
+		1:
+			gvl.Sensors.Scanner.Component:= 'BLUE CONTAINER';
+			gvl.Sensors.Scanner.Quatity := 1;
+		2:
+			gvl.Sensors.Scanner.Component:= 'YELLOW CONTAINER';
+			gvl.Sensors.Scanner.Quatity := 1;
+		3:
+			gvl.Sensors.Scanner.Component:= 'RED CONTAINER';
+			gvl.Sensors.Scanner.Quatity := 1;
+		4:
+			gvl.Sensors.Scanner.Component := 'INVALID PRODUCT';
+			gvl.Sensors.Scanner.Quatity := 1;
+		5:
+			gvl.Sensors.Scanner.Component := 'BLUE CYLINDER';
+			gvl.Sensors.Scanner.Quatity := 4;
+		6:
+			gvl.Sensors.Scanner.Component := 'BLUE OCTAGON';
+			gvl.Sensors.Scanner.Quatity := 4;
+		7:
+			gvl.Sensors.Scanner.Component := 'BLUE PLATE';
+			gvl.Sensors.Scanner.Quatity := 2;
+		8:
+			gvl.Sensors.Scanner.Component := 'INVALID PRODUCT';
+			gvl.Sensors.Scanner.Quatity := 1;
+		9:
+			gvl.Sensors.Scanner.Component := 'YELLOW CYLINDER';
+			gvl.Sensors.Scanner.Quatity := 4;
+		10:
+			gvl.Sensors.Scanner.Component := 'YELLOW OCTAGON';
+			gvl.Sensors.Scanner.Quatity := 4;
+		11:
+			gvl.Sensors.Scanner.Component := 'YELLOW PLATE';
+			gvl.Sensors.Scanner.Quatity := 2;
+		12:
+			gvl.Sensors.Scanner.Component := 'INVALID PRODUCT';
+			gvl.Sensors.Scanner.Quatity := 1;
+		13:
+			gvl.Sensors.Scanner.Component := 'RED CYLINDER';
+			gvl.Sensors.Scanner.Quatity := 4;
+		14:
+			gvl.Sensors.Scanner.Component := 'RED OCTAGON';
+			gvl.Sensors.Scanner.Quatity := 4;
+		15:
+			gvl.Sensors.Scanner.Component := 'RED PLATE';
+			gvl.Sensors.Scanner.Quatity := 2;
+	END_CASE;
+END_IF
+
+// Scanner Values Manual
+IF Manual_Mode.Manual_Lamp AND Scanner AND gvl.Sensors.Scanner.Component='UNKNOWN' AND (Manual_Mode_Control_Panel.ABBScannerStation.mxDone OR Automatic_Mode_Control_Panel.ABBScannerStation.mxDone) THEN
+	CASE Manual_Mode_Control_Panel.Scanner_Input.Sum OF
+		0:
+			gvl.Sensors.Scanner.Component := 'INVALID PRODUCT';
+			gvl.Sensors.Scanner.Quatity := 1;
+		1:
+			gvl.Sensors.Scanner.Component:= 'BLUE CONTAINER';
+			gvl.Sensors.Scanner.Quatity := 1;
+		2:
+			gvl.Sensors.Scanner.Component:= 'YELLOW CONTAINER';
+			gvl.Sensors.Scanner.Quatity := 1;
+		3:
+			gvl.Sensors.Scanner.Component:= 'RED CONTAINER';
+			gvl.Sensors.Scanner.Quatity := 1;
+		4:
+			gvl.Sensors.Scanner.Component := 'INVALID PRODUCT';
+			gvl.Sensors.Scanner.Quatity := 1;
+		5:
+			gvl.Sensors.Scanner.Component := 'BLUE CYLINDER';
+			gvl.Sensors.Scanner.Quatity := 4;
+		6:
+			gvl.Sensors.Scanner.Component := 'BLUE OCTAGON';
+			gvl.Sensors.Scanner.Quatity := 4;
+		7:
+			gvl.Sensors.Scanner.Component := 'BLUE PLATE';
+			gvl.Sensors.Scanner.Quatity := 2;
+		8:
+			gvl.Sensors.Scanner.Component := 'INVALID PRODUCT';
+			gvl.Sensors.Scanner.Quatity := 1;
+		9:
+			gvl.Sensors.Scanner.Component := 'YELLOW CYLINDER';
+			gvl.Sensors.Scanner.Quatity := 4;
+		10:
+			gvl.Sensors.Scanner.Component := 'YELLOW OCTAGON';
+			gvl.Sensors.Scanner.Quatity := 4;
+		11:
+			gvl.Sensors.Scanner.Component := 'YELLOW PLATE';
+			gvl.Sensors.Scanner.Quatity := 2;
+		12:
+			gvl.Sensors.Scanner.Component := 'INVALID PRODUCT';
+			gvl.Sensors.Scanner.Quatity := 1;
+		13:
+			gvl.Sensors.Scanner.Component := 'RED CYLINDER';
+			gvl.Sensors.Scanner.Quatity := 4;
+		14:
+			gvl.Sensors.Scanner.Component := 'RED OCTAGON';
+			gvl.Sensors.Scanner.Quatity := 4;
+		15:
+			gvl.Sensors.Scanner.Component := 'RED PLATE';
+			gvl.Sensors.Scanner.Quatity := 2;
+	END_CASE;
+END_IF]]></ST>
+    </Implementation>
+    <LineIds Name="Prompts">
+      <LineId Id="211" Count="0" />
+      <LineId Id="210" Count="0" />
+      <LineId Id="223" Count="1" />
+      <LineId Id="1001" Count="2" />
+      <LineId Id="213" Count="0" />
+      <LineId Id="1156" Count="13" />
+      <LineId Id="1048" Count="0" />
+      <LineId Id="1036" Count="0" />
+      <LineId Id="583" Count="0" />
+      <LineId Id="998" Count="0" />
+      <LineId Id="606" Count="0" />
+      <LineId Id="585" Count="3" />
+      <LineId Id="590" Count="0" />
+      <LineId Id="739" Count="0" />
+      <LineId Id="911" Count="4" />
+      <LineId Id="598" Count="2" />
+      <LineId Id="602" Count="0" />
+      <LineId Id="740" Count="0" />
+      <LineId Id="603" Count="0" />
+      <LineId Id="584" Count="0" />
+      <LineId Id="609" Count="0" />
+      <LineId Id="611" Count="3" />
+      <LineId Id="619" Count="0" />
+      <LineId Id="621" Count="1" />
+      <LineId Id="627" Count="0" />
+      <LineId Id="629" Count="1" />
+      <LineId Id="635" Count="1" />
+      <LineId Id="610" Count="0" />
+      <LineId Id="675" Count="0" />
+      <LineId Id="697" Count="2" />
+      <LineId Id="703" Count="0" />
+      <LineId Id="744" Count="0" />
+      <LineId Id="746" Count="1" />
+      <LineId Id="745" Count="0" />
+      <LineId Id="742" Count="0" />
+      <LineId Id="737" Count="0" />
+      <LineId Id="705" Count="0" />
+      <LineId Id="748" Count="0" />
+      <LineId Id="707" Count="1" />
+      <LineId Id="732" Count="1" />
+      <LineId Id="709" Count="4" />
+      <LineId Id="731" Count="0" />
+      <LineId Id="729" Count="0" />
+      <LineId Id="716" Count="0" />
+      <LineId Id="604" Count="0" />
+      <LineId Id="957" Count="2" />
+      <LineId Id="977" Count="0" />
+      <LineId Id="970" Count="0" />
+      <LineId Id="956" Count="0" />
+      <LineId Id="696" Count="0" />
+      <LineId Id="309" Count="0" />
+      <LineId Id="305" Count="0" />
+      <LineId Id="225" Count="0" />
+      <LineId Id="249" Count="1" />
+      <LineId Id="370" Count="0" />
+      <LineId Id="251" Count="0" />
+      <LineId Id="292" Count="0" />
+      <LineId Id="252" Count="2" />
+      <LineId Id="372" Count="0" />
+      <LineId Id="255" Count="0" />
+      <LineId Id="291" Count="0" />
+      <LineId Id="256" Count="2" />
+      <LineId Id="371" Count="0" />
+      <LineId Id="259" Count="0" />
+      <LineId Id="290" Count="0" />
+      <LineId Id="248" Count="0" />
+      <LineId Id="231" Count="0" />
+      <LineId Id="562" Count="0" />
+      <LineId Id="560" Count="0" />
+      <LineId Id="535" Count="0" />
+      <LineId Id="537" Count="17" />
+      <LineId Id="663" Count="3" />
+      <LineId Id="559" Count="0" />
+      <LineId Id="536" Count="0" />
+      <LineId Id="561" Count="0" />
+      <LineId Id="304" Count="0" />
+      <LineId Id="261" Count="1" />
+      <LineId Id="471" Count="0" />
+      <LineId Id="578" Count="2" />
+      <LineId Id="436" Count="0" />
+      <LineId Id="581" Count="0" />
+      <LineId Id="1020" Count="1" />
+      <LineId Id="280" Count="0" />
+      <LineId Id="1022" Count="0" />
+      <LineId Id="468" Count="0" />
+      <LineId Id="428" Count="0" />
+      <LineId Id="1018" Count="1" />
+      <LineId Id="282" Count="0" />
+      <LineId Id="284" Count="0" />
+      <LineId Id="469" Count="0" />
+      <LineId Id="285" Count="0" />
+      <LineId Id="1016" Count="1" />
+      <LineId Id="286" Count="0" />
+      <LineId Id="302" Count="0" />
+      <LineId Id="479" Count="0" />
+      <LineId Id="534" Count="0" />
+      <LineId Id="532" Count="0" />
+      <LineId Id="530" Count="0" />
+      <LineId Id="519" Count="10" />
+      <LineId Id="563" Count="2" />
+      <LineId Id="303" Count="0" />
+      <LineId Id="531" Count="0" />
+      <LineId Id="533" Count="0" />
+      <LineId Id="21" Count="3" />
+      <LineId Id="188" Count="0" />
+      <LineId Id="25" Count="2" />
+      <LineId Id="189" Count="0" />
+      <LineId Id="28" Count="2" />
+      <LineId Id="190" Count="0" />
+      <LineId Id="31" Count="5" />
+      <LineId Id="192" Count="0" />
+      <LineId Id="37" Count="2" />
+      <LineId Id="193" Count="0" />
+      <LineId Id="40" Count="2" />
+      <LineId Id="194" Count="0" />
+      <LineId Id="43" Count="2" />
+      <LineId Id="195" Count="0" />
+      <LineId Id="46" Count="2" />
+      <LineId Id="439" Count="6" />
+      <LineId Id="373" Count="0" />
+      <LineId Id="1388" Count="106" />
+      <LineId Id="1387" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>
